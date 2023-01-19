@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.4
+// @version      0.5
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -65,9 +65,7 @@ GM_registerMenuCommand("重新配置", async function() {
     GM_deleteValue("token");
     GM_deleteValue("behaviors");
     await init();
-    if(!GM_getValue("behaviors")){
-        window.location.reload(true);
-    }
+    window.location.reload(true);
 });
 GM_registerMenuCommand("清除配置", async function() {
     let r = await Swal.fire({
@@ -311,11 +309,9 @@ async function main(override){
             async function next(){
                 let restart = await check_token();
                 if(restart){
-                    if(!GM_getValue("behaviors")){
-                        window.location.reload(true);
-                        return;
-                    }
-                    return await main(override);
+                    window.location.reload(true);
+                    return;
+                    //return await main(override);
                 }
                 let code = window.location.pathname.split("/").pop().slice(0, 8);
                 pw = (pw||$("div.pucodeVal input").val()).slice(0, 4);
