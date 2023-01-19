@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.2
+// @version      0.3
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -170,7 +170,7 @@ async function init(first){
     if(GM_getValue("token").length===64&&(GM_getValue("behaviors")||[]).length!==2){
         let r = await Swal.fire({
             "title": (first?"检测第一次使用\n":"")+"请配置解析行为",
-            "html": "<div id='behaviors'><div class='bgroup'><div class='bheader'>进入 文件页 后</div><label><input type='checkbox'/><span>开始自动解析</span></label><label><input type='checkbox'/><span>不提示消耗 token</span></label></div></div>",
+            "html": "<div id='behaviors'><div class='bgroup'><div class='bheader'>进入 文件页 后</div><label><input type='checkbox' checked='checked'/><span>开始自动解析</span></label><label><input type='checkbox'/><span>不提示消耗 token</span></label></div></div>",
             "allowOutsideClick": false,
             "allowEscapeKey": false,
             "confirmButtonText": "保存",
