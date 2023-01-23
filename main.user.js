@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.6
+// @version      0.7
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -12,8 +12,8 @@
 // @match        https://www.feimaoyun.com/s/*
 // @icon         https://www.feimaoyun.cf/fmy.jpg
 // @require      https://cdn.bootcdn.net/ajax/libs/limonte-sweetalert2/11.7.0/sweetalert2.all.js
-// @updateURL    https://hub.fastgit.org/foxe6/www.feimaoyun.cf/raw/main/main.user.js
-// @downloadURL  https://hub.fastgit.org/foxe6/www.feimaoyun.cf/raw/main/main.user.js
+// @updateURL    https://raw.fastgit.org/foxe6/www.feimaoyun.cf/main/main.user.js
+// @downloadURL  https://raw.fastgit.org/foxe6/www.feimaoyun.cf/main/main.user.js
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
