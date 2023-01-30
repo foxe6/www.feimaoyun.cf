@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.7
+// @version      0.8
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -61,7 +61,7 @@ GM_registerMenuCommand("前往主站", function() {
         "confirmButtonText": "关闭"
     });
 });
-GM_registerMenuCommand("重新配置", async function() {
+/*GM_registerMenuCommand("重新配置", async function() {
     GM_deleteValue("token");
     GM_deleteValue("behaviors");
     await init();
@@ -83,6 +83,23 @@ GM_registerMenuCommand("清除配置", async function() {
     }
     GM_deleteValue("token");
     GM_deleteValue("behaviors");
+    window.location.reload(true);
+});*/
+GM_registerMenuCommand("清除 token", async function() {
+    let r = await Swal.fire({
+        "title": "清除 token？",
+        "showCancelButton": true,
+        "allowOutsideClick": false,
+        "allowEscapeKey": false,
+        "confirmButtonText": "确认",
+        "cancelButtonText": "取消",
+        "focusCancel": true,
+        "reverseButtons": true
+    });
+    if(!r.isConfirmed){
+        return;
+    }
+    GM_deleteValue("token");
     window.location.reload(true);
 });
 GM_registerMenuCommand("查询 token 次数", async function() {
@@ -168,7 +185,7 @@ async function init(first){
             }
         }
     }
-    if(GM_getValue("token").length===64&&(GM_getValue("behaviors")||[]).length!==2){
+    /*if(GM_getValue("token").length===64&&(GM_getValue("behaviors")||[]).length!==2){
         let r = await Swal.fire({
             "title": (first?"检测第一次使用\n":"")+"请配置解析行为",
             "html": "<div id='behaviors'><div class='bgroup'><div class='bheader'>进入 文件页 后</div><label><input type='checkbox' checked='checked'/><span>开始自动解析</span></label><label><input type='checkbox'/><span>不提示消耗 token</span></label></div></div>",
@@ -185,7 +202,7 @@ async function init(first){
             changed = 1;
             GM_setValue("behaviors", r.value);
         }
-    }
+    }*/
     if(first&&changed){
         await Swal.fire({
             "icon": "success",
@@ -294,9 +311,32 @@ function h_size(size) {
     return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + " " + ["B", "KiB", "MiB", "GiB", "TiB"][i];
 }
 async function main(override){
-    $("li.videoItem").parent().empty().append("<li id='videoItem' class='videoItem'><div class='cover'><img src='https://www.feimaoyun.cf/fmy.jpg'>开始解析</div></li>").off("click").on("click", async function(e){
+    $("div.fileVideoBox ul").remove();
+    if(GM_getValue("token").length===64){
+        let ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>自动<br/>开始解析</span></div></li></ul>").on("click", async function(e){
+            $(this).toggleClass("on").find("span span").toggle();
+            let behaviors = (GM_getValue("behaviors")||[0,0]);
+            behaviors[0] = !behaviors[0];
+            GM_setValue("behaviors", behaviors);
+        });
+        if((GM_getValue("behaviors")||[0,0])[0]){
+            ul.toggleClass("on").find("span span").toggle();
+        }
+        $("div.fileVideoBox").append(ul);
+        ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>提示消耗<br/>token</span></div></li></ul>").on("click", async function(e){
+            $(this).toggleClass("on").find("span span").toggle();
+            let behaviors = (GM_getValue("behaviors")||[0,0]);
+            behaviors[1] = !behaviors[1];
+            GM_setValue("behaviors", behaviors);
+        });
+        if(!(GM_getValue("behaviors")||[0,0])[1]){
+            ul.toggleClass("on").find("span span").toggle();
+        }
+        $("div.fileVideoBox").append(ul);
+    }
+    $("div.fileVideoBox").append($("<ul class='rightBox'><li id='videoItem' class='videoItem'><div class='cover'><img src='https://www.feimaoyun.cf/fmy.jpg'>解析</div></li></ul>").on("click", async function(e){
         await main(1);
-    });
+    }));
     $("div.main-content").scrollLeft(50);
     if(GM_getValue("token").length!==64){
         let iframe='<iframe id="fmy_embed" src="'+window.location.href.replace("n.com","n.cf")+'"></iframe>';
@@ -345,7 +385,7 @@ async function main(override){
         }
     }
 }
-$("head").append("<style>div#behaviors { display: flex; justify-content: center; align-items: center; flex-direction: column; }.bgroup label span { margin-left: 0.5em; }.bgroup label { margin-top: 0.25em;margin-left: 0.5em; display: flex; justify-content: center; align-items: center; }.bheader { font-weight: bold; font-size: 1.25em; }.bgroup { display: inline-flex; justify-content: center; align-items: flex-start; flex-direction: column;margin-top: 1em; }#fmy_embed{width: 100%;height: calc(100vh - 370px);min-width: 920px;border: 0;margin-top: 20px;}div.main-content{overflow-x:auto!important;}.swal2-popup {font-size: 1.5em !important;font-family: \"Microsoft JhengHei\", sans-serif;}#videoItem .cover{background-color: #fc9c40;color:#fff;display: flex; justify-content: space-evenly; align-items: center;}#videoItem .cover img{width: 2em; height: 2em;}</style>");
+$("head").append("<style>#videoItem .cover {border-color: #fc9c40;}ul.rightBox.on .cover{color: white;background-color:blue;}ul.rightBox .cover{text-align:center;border:1px solid #4693ff;color:#4693ff;font-size: 1.5em;display: flex;justify-content: space-evenly;align-items: center;}.fmDownA .fileBox .fileVideoBox .leftBox .fileName {width: 458px !important;}div#behaviors { display: flex; justify-content: center; align-items: center; flex-direction: column; }.bgroup label span { margin-left: 0.5em; }.bgroup label { margin-top: 0.25em;margin-left: 0.5em; display: flex; justify-content: center; align-items: center; }.bheader { font-weight: bold; font-size: 1.25em; }.bgroup { display: inline-flex; justify-content: center; align-items: flex-start; flex-direction: column;margin-top: 1em; }#fmy_embed{width: 100%;height: calc(100vh - 370px);min-width: 920px;border: 0;margin-top: 20px;}div.main-content{overflow-x:auto!important;}.swal2-popup {font-size: 1.5em !important;font-family: \"Microsoft JhengHei\", sans-serif;}#videoItem .cover{background-color: #fc9c40;color:#fff;display: flex; justify-content: space-evenly; align-items: center;}#videoItem .cover img{width: 2em; height: 2em;}</style>");
 setTimeout(async function() {
     await init(1);
     if(window.location.hostname==="www.feimaoyun.com"){
