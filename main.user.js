@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.8
+// @version      0.9
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -18,10 +18,12 @@
 // @grant        GM_getValue
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
+// @grant        unsafeWindow
 // @connect      www.feimaoyun.cf
 // @connect      www.feimaoyun.com
 // @connect      cdn.bootcdn.net
 // @connect      hub.fastgit.org
+// @connect      static.geetest.com
 // ==/UserScript==
 
 
@@ -137,9 +139,10 @@ async function token_ct(){
     let token = GM_getValue("token");
     return await post("token_ct"+(token?"&"+token:""));
 }
-async function get_file(code, pw){
+let cid="b56cfe7983ce98c89b8aead50efc3eff";
+async function get_file(code, pw, captcha){
     let token = GM_getValue("token");
-    return await post("get_file"+(token?"&"+token:""), JSON.stringify([code, pw, {}]));
+    return await post("get_file"+(token?"&"+token:""), JSON.stringify([code, pw, captcha]));
 }
 async function init(first){
     let changed=0;
@@ -265,10 +268,15 @@ async function check_token(){
         throw e;
     }
 }
-async function parse_file(code, pw){
+let capped=0;
+async function parse_file(code, pw, captcha){
     try{
-        let r = await get_file(code, pw);
+        let r = await get_file(code, pw, captcha);
         if("error" in r){
+            if(r["error"]==="capped"){
+                capped=1;
+                r["error"]="retry";
+            }
             await Swal.fire({
                 "icon": "error",
                 "title": "解析错误",
@@ -279,6 +287,7 @@ async function parse_file(code, pw){
             });
         }
         else{
+            capped=0;
             await Swal.fire({
                 "icon": "success",
                 "title": "解析成功",
@@ -309,6 +318,63 @@ async function parse_file(code, pw){
 function h_size(size) {
     let i = size === 0 ? 0 : Math.floor( Math.log(size) / Math.log(1024) );
     return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + " " + ["B", "KiB", "MiB", "GiB", "TiB"][i];
+}
+let _gt = $('<div id="geetest" class="hide"></div>');
+$("body").append(_gt);
+let mcloseti;
+_gt.get(0).addEventListener("click", function (e) {
+    if(e.target===this){
+        this.classList.add("hide");
+        mcloseti = setInterval(function () {
+            try{
+                document.querySelector("body>.geetest_boxShow").remove();
+            }catch(e){}
+        }, 100);
+    }
+});
+unsafeWindow.do_captcha = async function (){
+    return new Promise(function (resolve, reject) {
+        $(".swal2-container").hide();
+        clearInterval(mcloseti);
+        let captcha_body = document.querySelector("#geetest");
+        captcha_body.classList.remove("hide");
+        captcha_body.innerHTML = "";
+        console.log(unsafeWindow, window)
+        initGeetest4({
+            captchaId: cid,
+            product: "float",
+            language: "zho",
+            riskType: "slide",
+            mask: {
+                outside: !1
+            }
+        },function (captcha) {
+            captcha.appendTo("#geetest");
+            captcha.onReady(function(){
+                let ti = setInterval(function () {
+                    let e=document.querySelector('.geetest_btn_click');
+                    if(e){
+                        clearInterval(ti);
+                        e.click();
+                    }
+                }, 100);
+            }).onSuccess(function(){
+                let result = captcha.getValidate();
+                captcha_body.classList.add("hide");
+                $(".swal2-container").show();
+                resolve(result);
+            }).onError(function(){
+                $(".swal2-container").remove();
+                captcha_body.classList.add("hide");
+                resolve({"error": "retry"});
+            }).onClose(function(){
+                captcha.destroy();
+                $(".swal2-container").remove();
+                captcha_body.classList.add("hide");
+                resolve({"error": "retry"});
+            });
+        });
+    });
 }
 async function main(override){
     $("div.fileVideoBox ul").remove();
@@ -355,7 +421,22 @@ async function main(override){
                 }
                 let code = window.location.pathname.split("/").pop().slice(0, 8);
                 pw = (pw||$("div.pucodeVal input").val()).slice(0, 4);
-                await parse_file(code, pw);
+                let captcha = {"captcha_id":cid};
+                if(capped){
+                    captcha = await unsafeWindow.do_captcha();
+                    if(captcha["error"]==="retry"){
+                        await Swal.fire({
+                            "icon": "error",
+                            "title": "解析错误",
+                            "text": ex()[captcha["error"]],
+                            "allowOutsideClick": false,
+                            "allowEscapeKey": false,
+                            "confirmButtonText": "请稍后重试"
+                        });
+                        return;
+                    }
+                }
+                await parse_file(code, pw, captcha);
             }
             let r = {"isConfirmed": true};
             if(!(GM_getValue("behaviors")||[0,0])[1]){
@@ -385,6 +466,7 @@ async function main(override){
         }
     }
 }
+$("head").append("<style>div#geetest{ display: flex; justify-content: center; align-items: center; position: fixed; flex-wrap: wrap; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); transition: all 666ms; } div#geetest.hide{ opacity: 0; pointer-events: none; } .geetest_captcha{ width: 340px !important; height: 385px !important; } .geetest_captcha .geetest_holder{ width: 340px !important; height: 385px !important; } /*.geetest_box_wrap, .geetest_box_wrap .geetest_box{*/ /*    top: 0 !important;*/ /*    left: 0 !important;*/ /*    transform: none !important;*/ /*}*/ .geetest_popup_ghost, .geetest_holder .geetest_content{ display: none !important; } .geetest_slice{ z-index: 999; }</style>");
 $("head").append("<style>#videoItem .cover {border-color: #fc9c40;}ul.rightBox.on .cover{color: white;background-color:blue;}ul.rightBox .cover{text-align:center;border:1px solid #4693ff;color:#4693ff;font-size: 1.5em;display: flex;justify-content: space-evenly;align-items: center;}.fmDownA .fileBox .fileVideoBox .leftBox .fileName {width: 458px !important;}div#behaviors { display: flex; justify-content: center; align-items: center; flex-direction: column; }.bgroup label span { margin-left: 0.5em; }.bgroup label { margin-top: 0.25em;margin-left: 0.5em; display: flex; justify-content: center; align-items: center; }.bheader { font-weight: bold; font-size: 1.25em; }.bgroup { display: inline-flex; justify-content: center; align-items: flex-start; flex-direction: column;margin-top: 1em; }#fmy_embed{width: 100%;height: calc(100vh - 370px);min-width: 920px;border: 0;margin-top: 20px;}div.main-content{overflow-x:auto!important;}.swal2-popup {font-size: 1.5em !important;font-family: \"Microsoft JhengHei\", sans-serif;}#videoItem .cover{background-color: #fc9c40;color:#fff;display: flex; justify-content: space-evenly; align-items: center;}#videoItem .cover img{width: 2em; height: 2em;}</style>");
 setTimeout(async function() {
     await init(1);
