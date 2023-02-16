@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.9
+// @version      0.10
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -53,7 +53,8 @@ let ex = function(){
         "heavy load": "今天公用解析额满，隔天恢复<br/>试试领 VIP 试用券；重试几次蹭 VIP 通道",
         "account": "是的，炸了，隔天才能恢复",
         "retry": "验证失败",
-        "token expire": "VIP 解析次数耗尽"
+        "token expire": "VIP 解析次数耗尽",
+        "capped": "飞猫要求重新验证"
     };
 }
 let pw = window.location.search.indexOf("pucode=")!==-1&&window.location.search.split("pucode=").slice(-1)[0];
@@ -140,9 +141,10 @@ async function token_ct(){
     return await post("token_ct"+(token?"&"+token:""));
 }
 let cid="b56cfe7983ce98c89b8aead50efc3eff";
-async function get_file(code, pw, captcha){
+let cid0 = "323f030b9dc7f18bc35a93dcee64b4a7";
+async function get_file(code, pw, captcha0, captcha){
     let token = GM_getValue("token");
-    return await post("get_file"+(token?"&"+token:""), JSON.stringify([code, pw, captcha]));
+    return await post("get_file"+(token?"&"+token:""), JSON.stringify([code, pw, captcha0, captcha]));
 }
 async function init(first){
     let changed=0;
@@ -269,14 +271,12 @@ async function check_token(){
     }
 }
 let capped=0;
-async function parse_file(code, pw, captcha){
+async function parse_file(code, pw, captcha0, captcha){
+    captcha0 = captcha0||{"captcha_id":""};
+    captcha = captcha||{"captcha_id":""};
     try{
-        let r = await get_file(code, pw, captcha);
+        let r = await get_file(code, pw, captcha0, captcha);
         if("error" in r){
-            if(r["error"]==="capped"){
-                capped=1;
-                r["error"]="retry";
-            }
             await Swal.fire({
                 "icon": "error",
                 "title": "解析错误",
@@ -285,6 +285,24 @@ async function parse_file(code, pw, captcha){
                 "allowEscapeKey": false,
                 "confirmButtonText": "请稍后重试"
             });
+            if(r["error"]==="capped"){
+                captcha = await unsafeWindow.do_captcha();
+                if("error" in captcha){
+                    await Swal.fire({
+                        "icon": "error",
+                        "title": "解析错误",
+                        "text": ex()[captcha["error"]]||captcha["error"],
+                        "allowOutsideClick": false,
+                        "allowEscapeKey": false,
+                        "confirmButtonText": "请稍后重试"
+                    });
+                }
+                else{
+                    showwait();
+                    await parse_file(code, pw, captcha0, captcha);
+                }
+                return;
+            }
         }
         else{
             capped=0;
@@ -332,16 +350,15 @@ _gt.get(0).addEventListener("click", function (e) {
         }, 100);
     }
 });
-unsafeWindow.do_captcha = async function (){
+unsafeWindow.do_captcha = async function (dl){
     return new Promise(function (resolve, reject) {
         $(".swal2-container").hide();
         clearInterval(mcloseti);
         let captcha_body = document.querySelector("#geetest");
         captcha_body.classList.remove("hide");
         captcha_body.innerHTML = "";
-        console.log(unsafeWindow, window)
         initGeetest4({
-            captchaId: cid,
+            captchaId: dl?cid0:cid,
             product: "float",
             language: "zho",
             riskType: "slide",
@@ -421,22 +438,19 @@ async function main(override){
                 }
                 let code = window.location.pathname.split("/").pop().slice(0, 8);
                 pw = (pw||$("div.pucodeVal input").val()).slice(0, 4);
-                let captcha = {"captcha_id":cid};
-                if(capped){
-                    captcha = await unsafeWindow.do_captcha();
-                    if(captcha["error"]==="retry"){
-                        await Swal.fire({
-                            "icon": "error",
-                            "title": "解析错误",
-                            "text": ex()[captcha["error"]],
-                            "allowOutsideClick": false,
-                            "allowEscapeKey": false,
-                            "confirmButtonText": "请稍后重试"
-                        });
-                        return;
-                    }
+                let captcha0 = await unsafeWindow.do_captcha(true);
+                if(captcha0["error"]==="retry"){
+                    await Swal.fire({
+                        "icon": "error",
+                        "title": "解析错误",
+                        "text": ex()[captcha0["error"]],
+                        "allowOutsideClick": false,
+                        "allowEscapeKey": false,
+                        "confirmButtonText": "请稍后重试"
+                    });
+                    return;
                 }
-                await parse_file(code, pw, captcha);
+                await parse_file(code, pw, captcha0);
             }
             let r = {"isConfirmed": true};
             if(!(GM_getValue("behaviors")||[0,0])[1]){
@@ -453,18 +467,21 @@ async function main(override){
                 });
             }
             if(r.isConfirmed){
-                Swal.fire({
-                    "title": "解析中",
-                    "text": "请稍等",
-                    "allowOutsideClick": false,
-                    "allowEscapeKey": false,
-                    "confirmButtonText": "确认"
-                });
-                Swal.showLoading();
+                showwait();
                 await next();
             }
         }
     }
+}
+function showwait(){
+    Swal.fire({
+        "title": "解析中",
+        "text": "请稍等",
+        "allowOutsideClick": false,
+        "allowEscapeKey": false,
+        "confirmButtonText": "确认"
+    });
+    Swal.showLoading();
 }
 $("head").append("<style>div#geetest{ display: flex; justify-content: center; align-items: center; position: fixed; flex-wrap: wrap; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); transition: all 666ms; } div#geetest.hide{ opacity: 0; pointer-events: none; } .geetest_captcha{ width: 340px !important; height: 385px !important; } .geetest_captcha .geetest_holder{ width: 340px !important; height: 385px !important; } /*.geetest_box_wrap, .geetest_box_wrap .geetest_box{*/ /*    top: 0 !important;*/ /*    left: 0 !important;*/ /*    transform: none !important;*/ /*}*/ .geetest_popup_ghost, .geetest_holder .geetest_content{ display: none !important; } .geetest_slice{ z-index: 999; }</style>");
 $("head").append("<style>#videoItem .cover {border-color: #fc9c40;}ul.rightBox.on .cover{color: white;background-color:blue;}ul.rightBox .cover{text-align:center;border:1px solid #4693ff;color:#4693ff;font-size: 1.5em;display: flex;justify-content: space-evenly;align-items: center;}.fmDownA .fileBox .fileVideoBox .leftBox .fileName {width: 458px !important;}div#behaviors { display: flex; justify-content: center; align-items: center; flex-direction: column; }.bgroup label span { margin-left: 0.5em; }.bgroup label { margin-top: 0.25em;margin-left: 0.5em; display: flex; justify-content: center; align-items: center; }.bheader { font-weight: bold; font-size: 1.25em; }.bgroup { display: inline-flex; justify-content: center; align-items: flex-start; flex-direction: column;margin-top: 1em; }#fmy_embed{width: 100%;height: calc(100vh - 370px);min-width: 920px;border: 0;margin-top: 20px;}div.main-content{overflow-x:auto!important;}.swal2-popup {font-size: 1.5em !important;font-family: \"Microsoft JhengHei\", sans-serif;}#videoItem .cover{background-color: #fc9c40;color:#fff;display: flex; justify-content: space-evenly; align-items: center;}#videoItem .cover img{width: 2em; height: 2em;}</style>");
