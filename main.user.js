@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         feimaoyun 解析 飞猫云
 // @namespace    feimaoyun.cf
-// @version      0.10
+// @version      1.0
 // @description  try to take over the world!
 // @website      https://www.feimaoyun.cf/
 // @homepage     https://github.com/foxe6/www.feimaoyun.cf
@@ -53,8 +53,7 @@ let ex = function(){
         "heavy load": "今天公用解析额满，隔天恢复<br/>试试领 VIP 试用券；重试几次蹭 VIP 通道",
         "account": "是的，炸了，隔天才能恢复",
         "retry": "验证失败",
-        "token expire": "VIP 解析次数耗尽",
-        "capped": "飞猫要求重新验证"
+        "token expire": "VIP 解析次数耗尽"
     };
 }
 let pw = window.location.search.indexOf("pucode=")!==-1&&window.location.search.split("pucode=").slice(-1)[0];
@@ -138,13 +137,14 @@ function post(url, data){
 }
 async function token_ct(){
     let token = GM_getValue("token");
-    return await post("token_ct"+(token?"&"+token:""));
+    if(token.length!==64){
+        return 999;
+    }
+    return await post("token_ct"+(token.length===64?"&"+token:""));
 }
-let cid="b56cfe7983ce98c89b8aead50efc3eff";
-let cid0 = "323f030b9dc7f18bc35a93dcee64b4a7";
-async function get_file(code, pw, captcha0, captcha){
+async function get_file(code, pw){
     let token = GM_getValue("token");
-    return await post("get_file"+(token?"&"+token:""), JSON.stringify([code, pw, captcha0, captcha]));
+    return await post("get_file"+(token.length===64?"&"+token:""), JSON.stringify([code, pw, {}, {}]));
 }
 async function init(first){
     let changed=0;
@@ -270,12 +270,9 @@ async function check_token(){
         throw e;
     }
 }
-let capped=0;
-async function parse_file(code, pw, captcha0, captcha){
-    captcha0 = captcha0||{"captcha_id":""};
-    captcha = captcha||{"captcha_id":""};
+async function parse_file(code, pw){
     try{
-        let r = await get_file(code, pw, captcha0, captcha);
+        let r = await get_file(code, pw);
         if("error" in r){
             await Swal.fire({
                 "icon": "error",
@@ -285,27 +282,8 @@ async function parse_file(code, pw, captcha0, captcha){
                 "allowEscapeKey": false,
                 "confirmButtonText": "请稍后重试"
             });
-            if(r["error"]==="capped"){
-                captcha = await unsafeWindow.do_captcha();
-                if("error" in captcha){
-                    await Swal.fire({
-                        "icon": "error",
-                        "title": "解析错误",
-                        "text": ex()[captcha["error"]]||captcha["error"],
-                        "allowOutsideClick": false,
-                        "allowEscapeKey": false,
-                        "confirmButtonText": "请稍后重试"
-                    });
-                }
-                else{
-                    showwait();
-                    await parse_file(code, pw, captcha0, captcha);
-                }
-                return;
-            }
         }
         else{
-            capped=0;
             await Swal.fire({
                 "icon": "success",
                 "title": "解析成功",
@@ -337,139 +315,61 @@ function h_size(size) {
     let i = size === 0 ? 0 : Math.floor( Math.log(size) / Math.log(1024) );
     return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + " " + ["B", "KiB", "MiB", "GiB", "TiB"][i];
 }
-let _gt = $('<div id="geetest" class="hide"></div>');
-$("body").append(_gt);
-let mcloseti;
-_gt.get(0).addEventListener("click", function (e) {
-    if(e.target===this){
-        this.classList.add("hide");
-        mcloseti = setInterval(function () {
-            try{
-                document.querySelector("body>.geetest_boxShow").remove();
-            }catch(e){}
-        }, 100);
-    }
-});
-unsafeWindow.do_captcha = async function (dl){
-    return new Promise(function (resolve, reject) {
-        $(".swal2-container").hide();
-        clearInterval(mcloseti);
-        let captcha_body = document.querySelector("#geetest");
-        captcha_body.classList.remove("hide");
-        captcha_body.innerHTML = "";
-        initGeetest4({
-            captchaId: dl?cid0:cid,
-            product: "float",
-            language: "zho",
-            riskType: "slide",
-            mask: {
-                outside: !1
-            }
-        },function (captcha) {
-            captcha.appendTo("#geetest");
-            captcha.onReady(function(){
-                let ti = setInterval(function () {
-                    let e=document.querySelector('.geetest_btn_click');
-                    if(e){
-                        clearInterval(ti);
-                        e.click();
-                    }
-                }, 100);
-            }).onSuccess(function(){
-                let result = captcha.getValidate();
-                captcha_body.classList.add("hide");
-                $(".swal2-container").show();
-                resolve(result);
-            }).onError(function(){
-                $(".swal2-container").remove();
-                captcha_body.classList.add("hide");
-                resolve({"error": "retry"});
-            }).onClose(function(){
-                captcha.destroy();
-                $(".swal2-container").remove();
-                captcha_body.classList.add("hide");
-                resolve({"error": "retry"});
-            });
-        });
-    });
-}
 async function main(override){
     $("div.fileVideoBox ul").remove();
-    if(GM_getValue("token").length===64){
-        let ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>自动<br/>开始解析</span></div></li></ul>").on("click", async function(e){
-            $(this).toggleClass("on").find("span span").toggle();
-            let behaviors = (GM_getValue("behaviors")||[0,0]);
-            behaviors[0] = !behaviors[0];
-            GM_setValue("behaviors", behaviors);
-        });
-        if((GM_getValue("behaviors")||[0,0])[0]){
-            ul.toggleClass("on").find("span span").toggle();
-        }
-        $("div.fileVideoBox").append(ul);
-        ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>提示消耗<br/>token</span></div></li></ul>").on("click", async function(e){
-            $(this).toggleClass("on").find("span span").toggle();
-            let behaviors = (GM_getValue("behaviors")||[0,0]);
-            behaviors[1] = !behaviors[1];
-            GM_setValue("behaviors", behaviors);
-        });
-        if(!(GM_getValue("behaviors")||[0,0])[1]){
-            ul.toggleClass("on").find("span span").toggle();
-        }
-        $("div.fileVideoBox").append(ul);
+    let ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>自动<br/>开始解析</span></div></li></ul>").on("click", async function(e){
+        $(this).toggleClass("on").find("span span").toggle();
+        let behaviors = (GM_getValue("behaviors")||[0,0]);
+        behaviors[0] = !behaviors[0];
+        GM_setValue("behaviors", behaviors);
+    });
+    if((GM_getValue("behaviors")||[0,0])[0]){
+        ul.toggleClass("on").find("span span").toggle();
     }
+    $("div.fileVideoBox").append(ul);
+    ul = $("<ul class='rightBox'><li class='videoItem'><div class='cover'><span><span>不</span>提示消耗<br/>token</span></div></li></ul>").on("click", async function(e){
+        $(this).toggleClass("on").find("span span").toggle();
+        let behaviors = (GM_getValue("behaviors")||[0,0]);
+        behaviors[1] = !behaviors[1];
+        GM_setValue("behaviors", behaviors);
+    });
+    if(!(GM_getValue("behaviors")||[0,0])[1]){
+        ul.toggleClass("on").find("span span").toggle();
+    }
+    $("div.fileVideoBox").append(ul);
     $("div.fileVideoBox").append($("<ul class='rightBox'><li id='videoItem' class='videoItem'><div class='cover'><img src='https://www.feimaoyun.cf/fmy.jpg'>解析</div></li></ul>").on("click", async function(e){
         await main(1);
     }));
     $("div.main-content").scrollLeft(50);
-    if(GM_getValue("token").length!==64){
-        let iframe='<iframe id="fmy_embed" src="'+window.location.href.replace("n.com","n.cf")+'"></iframe>';
-        $("div.normalBox").children().not("div.fileBox").remove();
-        $("div.fileBox div.actBox").remove();
-        $("div.normalBox").append(iframe);
-    }
-    else{
-        if(override||(GM_getValue("behaviors")||[0,0])[0]){
-            async function next(){
-                let restart = await check_token();
-                if(restart){
-                    window.location.reload(true);
-                    return;
-                    //return await main(override);
-                }
-                let code = window.location.pathname.split("/").pop().slice(0, 8);
-                pw = (pw||$("div.pucodeVal input").val()).slice(0, 4);
-                let captcha0 = await unsafeWindow.do_captcha(true);
-                if(captcha0["error"]==="retry"){
-                    await Swal.fire({
-                        "icon": "error",
-                        "title": "解析错误",
-                        "text": ex()[captcha0["error"]],
-                        "allowOutsideClick": false,
-                        "allowEscapeKey": false,
-                        "confirmButtonText": "请稍后重试"
-                    });
-                    return;
-                }
-                await parse_file(code, pw, captcha0);
+    if(override||(GM_getValue("behaviors")||[0,0])[0]){
+        async function next(){
+            let restart = await check_token();
+            if(restart){
+                window.location.reload(true);
+                return;
+                //return await main(override);
             }
-            let r = {"isConfirmed": true};
-            if(!(GM_getValue("behaviors")||[0,0])[1]){
-                r = await Swal.fire({
-                    "title": "开始解析？",
-                    "text": "解析将消耗次数",
-                    "showCancelButton": true,
-                    "allowOutsideClick": false,
-                    "allowEscapeKey": false,
-                    "confirmButtonText": "确认",
-                    "cancelButtonText": "取消",
-                    "focusCancel": true,
-                    "reverseButtons": true
-                });
-            }
-            if(r.isConfirmed){
-                showwait();
-                await next();
-            }
+            let code = window.location.pathname.split("/").pop().slice(0, 8);
+            pw = (pw||$("div.pucodeVal input").val()).slice(0, 4);
+            await parse_file(code, pw);
+        }
+        let r = {"isConfirmed": true};
+        if(!(GM_getValue("behaviors")||[0,0])[1]){
+            r = await Swal.fire({
+                "title": "开始解析？",
+                "text": "解析将消耗次数",
+                "showCancelButton": true,
+                "allowOutsideClick": false,
+                "allowEscapeKey": false,
+                "confirmButtonText": "确认",
+                "cancelButtonText": "取消",
+                "focusCancel": true,
+                "reverseButtons": true
+            });
+        }
+        if(r.isConfirmed){
+            showwait();
+            await next();
         }
     }
 }
